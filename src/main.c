@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 
 
@@ -25,7 +26,17 @@ int main(int argc, char *argv[]){
     strcat(filepath,suffix);
 
     if(strcmp(command,"init") == 0){
-        mkdir(filepath,0755); // normal permission settings
+        int status;
+        if(mkdir(filepath,0755)<0){ // normal permission settings
+            if(errno == EACCES){
+                printf("Fail with access\n");
+            }else if(errno == EEXIST){
+                printf("Fail because directory already exists\n");
+            }
+            // TODO: add all Errors
+            return -1; // early return
+        } 
+
         printf("initialize Repo");
     }
     free(filepath); // free memory
