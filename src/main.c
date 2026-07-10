@@ -57,5 +57,7 @@ int main(int argc, char *argv[]){
         }
         printf("Änderung: %s \n",ctime(&fileMeta.st_mtime));
         printf( "Size: %ld",&fileMeta.st_size);
+    }else{
+        printf("%s is not a valid command for Bombagit",command);
     }
 }
