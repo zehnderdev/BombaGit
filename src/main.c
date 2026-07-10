@@ -11,6 +11,85 @@
 #include "sha256.h"
 
 
+
+
+int hashAll(char *filepath){
+    struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
+        // from stat we get st_size for bytesize
+        // st_ino for the inode (unique identifier)
+        // and st_mtime for last 
+        // check with inode if we have file already if not git add
+        printf(filepath);
+        DIR *dir; // directory pointer
+        struct dirent *dirent; // directory entry
+
+        if((dir=opendir(filepath))==NULL){
+            printf("Error opening directory");
+            return -1;
+        }
+        do
+        {
+            if ((dirent =readdir(dir))!=NULL)
+            {
+                // ignore . and ..
+
+                if(strcmp(dirent->d_name,".")==0 ||
+                strcmp(dirent->d_name,"..")==0 || strcmp(dirent->d_name,".bgit")==0) continue;
+                
+
+                char fullpath[4096];
+                //append filepath with dir path
+                snprintf(fullpath,sizeof(fullpath),"%s/%s",filepath,dirent->d_name);
+
+            
+                // TODO: check if the file is a newly created file(untracked)
+                switch (dirent->d_type){
+
+                case 8:
+                    // file
+                    // check contents
+                    // load old stats
+                    struct stat old;
+                    stat(fullpath,&fileMeta);//get fileMetaData
+                    printf("got metadata for %s \n",dirent->d_name);
+                    if(fileMeta.st_ctime > old.st_ctime && fileMeta.st_size != old.st_size){
+                        char *hash = hashFile(fullpath);
+                        if(hash){
+                            printf("Hash: %s \n",hash);
+                            free(hash);
+                        }
+
+                    }
+                    break;
+
+                case 4:
+                    // dir 
+                    // recursion
+
+                    printf("Dir: %s using recursion\n",fullpath);
+
+                    hashAll(fullpath);
+                    break;
+                
+                case 12:
+                    // symbolic link
+                    break;
+                
+                case 0:
+                    // unknown could also be symlink
+                    break;
+
+                default:
+                    break;
+                }
+            }
+            
+        } while (dirent!=NULL);
+    closedir(dir);
+    return 0;
+
+}
+
 int main(int argc, char *argv[]){
     
     // if init command -> create ".bgit" file
@@ -47,67 +126,7 @@ int main(int argc, char *argv[]){
         // want to check if files have changed by  first looking at changetime and filesize 
         // if the chance is high the file actually changed we compute the hash and compare it to the old hash from the file we computed before
         printf("Status\n");
-        struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
-        // from stat we get st_size for bytesize
-        // st_ino for the inode (unique identifier)
-        // and st_mtime for last 
-        if(stat("main.c",&fileMeta)!=0){
-            printf("Error reading file");
-            return -1;
-        }
-        // check with inode if we have file already if not git add
-
-        DIR *dir; // directory pointer
-        struct dirent *dirent; // directory entry
-
-        if((dir=opendir("."))==NULL){
-            printf("Error opening directory");
-            return -1;
-        }
-        do
-        {
-            if ((dirent =readdir(dir))!=NULL)
-            {
-                // TODO: check if the file is a newly created file(untracked)
-                switch (dirent->d_type){
-
-                case 8:
-                    // file
-                    // check contents
-                    // load old stats
-                    struct stat old;
-                    stat(dirent->d_name,&fileMeta);//get fileMetaData
-                    printf("got metadata for %s \n",dirent->d_name);
-                    if(fileMeta.st_ctime > old.st_ctime && fileMeta.st_size != old.st_size){
-                        char *hash = hashFile(dirent->d_name);
-                        printf("Hash: %s",hash);
-                    }
-                    break;
-
-                case 4:
-                    // dir 
-                    // recursion
-                    break;
-                
-                case 12:
-                    // symbolic link
-                    break;
-                
-                case 0:
-                    // unknown could also be symlink
-                    break;
-
-                default:
-                    break;
-                }
-            }
-            
-        } while (dirent!=NULL);
-        
-        
-     
-        
-        
+        hashAll(".");
 
 
         
