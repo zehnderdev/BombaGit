@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <openssl/evp.h>
+#include <time.h>
 
 
 
@@ -40,5 +42,20 @@ int main(int argc, char *argv[]){
 
         printf("initialize Repo");
         free(filepath); // free memory
+    }else if (strcmp(command,"status")==0){
+        // TODO: apply with branches
+        // want to check if files have changed by  first looking at changetime and filesize 
+        // if the chance is high the file actually changed we compute the hash and compare it to the old hash from the file we computed before
+        printf("Status");
+        struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
+        // from stat we get st_size for bytesize
+        // st_ino for the inode (unique identifier)
+        // and st_mtime for last 
+        if(stat("main.c",&fileMeta)!=0){
+            printf("Error reading file");
+            return -1;
+        }
+        printf("Änderung: %s \n",ctime(&fileMeta.st_mtime));
+        printf( "Size: %ld",&fileMeta.st_size);
     }
 }
