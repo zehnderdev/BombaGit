@@ -7,11 +7,11 @@
 #include <errno.h>
 #include <openssl/evp.h>
 #include <time.h>
-
+#include <dirent.h>
+#include "sha256.h"
 
 
 int main(int argc, char *argv[]){
-
     
     // if init command -> create ".bgit" file
     if(argc <2) return 1; // check if we have 2 arguments at least (first always filename)
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]){
         // TODO: apply with branches
         // want to check if files have changed by  first looking at changetime and filesize 
         // if the chance is high the file actually changed we compute the hash and compare it to the old hash from the file we computed before
-        printf("Status");
+        printf("Status\n");
         struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
         // from stat we get st_size for bytesize
         // st_ino for the inode (unique identifier)
@@ -55,8 +55,64 @@ int main(int argc, char *argv[]){
             printf("Error reading file");
             return -1;
         }
-        printf("Änderung: %s \n",ctime(&fileMeta.st_mtime));
-        printf( "Size: %ld",&fileMeta.st_size);
+        // check with inode if we have file already if not git add
+
+        DIR *dir; // directory pointer
+        struct dirent *dirent; // directory entry
+
+        if((dir=opendir("."))==NULL){
+            printf("Error opening directory");
+            return -1;
+        }
+        do
+        {
+            if ((dirent =readdir(dir))!=NULL)
+            {
+                // TODO: check if the file is a newly created file(untracked)
+                switch (dirent->d_type){
+
+                case 8:
+                    // file
+                    // check contents
+                    // load old stats
+                    struct stat old;
+                    stat(dirent->d_name,&fileMeta);//get fileMetaData
+                    printf("got metadata for %s \n",dirent->d_name);
+                    if(fileMeta.st_ctime > old.st_ctime && fileMeta.st_size != old.st_size){
+                        char *hash = hashFile(dirent->d_name);
+                        printf("Hash: %s",hash);
+                    }
+                    break;
+
+                case 4:
+                    // dir 
+                    // recursion
+                    break;
+                
+                case 12:
+                    // symbolic link
+                    break;
+                
+                case 0:
+                    // unknown could also be symlink
+                    break;
+
+                default:
+                    break;
+                }
+            }
+            
+        } while (dirent!=NULL);
+        
+        
+     
+        
+        
+
+
+        
+    }else if(strcmp(command,"add")==0){
+        // add 
     }else{
         printf("%s is not a valid command for Bombagit",command);
     }
