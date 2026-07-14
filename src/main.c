@@ -11,7 +11,50 @@
 #include "sha256.h"
 
 
+int makeFile(char *destination,char *source){
+    FILE *dst,*src;
 
+    src = fopen(source,"rb");
+
+
+    if(src==NULL){
+        perror("fopen");
+        return -1;
+    }
+
+    if(chdir(".bgit")!=0){
+        printf("Error switchting directory");
+        return -1;
+    }
+    
+    char cwd[64]; //hopefully more than enough
+    getcwd(cwd,sizeof(cwd));
+    printf("We are in: %s",cwd); 
+
+    dst = fopen(destination,"wb");
+
+    if(dst==NULL){
+        perror("fopen");
+        chdir("..");
+        return -1;
+    }
+
+    unsigned char buffer[4096];
+    size_t bytesRead;
+
+    while ((bytesRead =fread(buffer,1,sizeof(buffer),src))>0)
+    {
+        fwrite(buffer,1,bytesRead,dst);
+    }
+    fclose(dst);
+
+    if(chdir("..")!=0){
+        printf("Error switchting directory");
+        return -1;
+    }
+    fclose(src);
+    return 0;
+}
 
 int hashAll(char *filepath){
     struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
@@ -56,6 +99,7 @@ int hashAll(char *filepath){
                         char *hash = hashFile(fullpath);
                         if(hash){
                             printf("Hash: %s \n",hash);
+                            makeFile(dirent->d_name,dirent->d_name);
                             free(hash);
                         }
 
@@ -125,9 +169,14 @@ int main(int argc, char *argv[]){
         // TODO: apply with branches
         // want to check if files have changed by  first looking at changetime and filesize 
         // if the chance is high the file actually changed we compute the hash and compare it to the old hash from the file we computed before
+        clock_t t = clock();
         printf("Status\n");
+        
         hashAll(".");
-
+        t = clock() - t;
+        double time_spent = ((double)t) *1000 / CLOCKS_PER_SEC;
+        printf("Took %fms",time_spent);
+        return 0;
 
         
     }else if(strcmp(command,"add")==0){
