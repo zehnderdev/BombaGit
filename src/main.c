@@ -11,113 +11,20 @@
 #include "sha256.h"
 
 
-// searches if we are in a .bgit repository 
-// chInto = 0 ->chdir into top level folder
-int searchbGit(int chInto){
-    DIR *dir;
-    struct dirent *dirent;
-    char cwd[128];
-    getcwd(cwd,sizeof(cwd));
-    printf("In: %s",cwd);
-    // optimization of using first string and rm until next '/' instead of cwd overwriting
-    while ((strcmp(cwd,"/"))!=0)
-    {
-        printf("In: %s \n",cwd);
-        if((dir=opendir("."))==NULL){
-            printf("Error opening directory1");
-            return 1;
-        }
-        if ((dirent =readdir(dir))==NULL){
-            printf("Error reading directory1");
-            return 1;
-        }
-        while (dirent!=NULL)
-        {
-            
-            if((strcmp(dirent->d_name,".bgit")==0)){
-                getcwd(cwd,sizeof(cwd));
-                if(chInto==0){
-                    if(chdir(cwd)!=0){
-                        printf("Error changing directory");
-                    }
-                }
-                printf("Found '.bgit' in %s ",cwd);
-                return 0;
-            }
-            
-            dirent =readdir(dir);
-        }
-        closedir(dir);
-        if((chdir(".."))!=0){
-            printf("Error changing directory");
-            return 1;
-        }
-        getcwd(cwd,sizeof(cwd));
-    }
-    printf("Not in a repository");
-    return 1;
-}
-
-struct FileMeta
-{
-    dev_t inode;
-    off_t size;
-    time_t mtime; //modification time
-    char name[128];
-};
-
-int makeIndx(char *filename,struct stat FileMetaData){
-    if((searchbGit(0))!=0) return -1;
-    FILE *indx;
-
-    struct FileMeta content ;
-    strcpy(content.name,filename);
-    content.inode =FileMetaData.st_ino;
-    content.size =FileMetaData.st_size;
-    content.mtime = FileMetaData.st_mtime;
+// TODO: function for easy directory switching
 
 
-    if(chdir(".bgit")!=0){
-        printf("Error changing directory");
-        return 1;
-    }
-
-    indx =fopen("index","wb");
-    fwrite(&content,sizeof(content),1,indx);
-
-    fclose(indx);
-
-}
-int readIndx(){
-    if((searchbGit(0))!=0) return -1;
-    FILE *indx;
-
-    struct FileMeta content;
-    
-    if(chdir(".bgit")!=0){
-        printf("Error changing directory");
-        return 1;
-    }
-
-    indx =fopen("index","rb");
-    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[128]),SEEK_CUR);
-    fread(&content,sizeof(content),1,indx);
-   
-    
-    printf("Name: %s",content.name);
-    fclose(indx);
-}
-// Change into the Top-Level Folder of the Repository
-// assuming we are in a Repositorys
-int chdirTop(){
-    char cwd[64];
-    getcwd(cwd,sizeof(cwd));
-
-}
 // Copies a file from destination to source
 int makeFile(char *destination,char *source){
-    FILE *dst,*src;
 
+    // TODO: Add directory with hashall 
+    FILE *dst,*src;
+    char cwd2[64];
+    getcwd(cwd2,sizeof(cwd2));
+    printf("We are in %s\n",cwd2);
+    printf("Adress:%s\n",source);
+    char *hash = hashFile(source);
+    printf("Hash is :%s \n",hash);
     src = fopen(source,"rb");
 
 
@@ -127,16 +34,16 @@ int makeFile(char *destination,char *source){
     }
 
     if(chdir(".bgit")!=0){
-        printf("Error switchting directory");
+        printf("Error switchting directory\n");
         return 1;
     }
     
     char cwd[64]; //hopefully more than enough
     getcwd(cwd,sizeof(cwd));
-    printf("We are in: %s",cwd); 
+    printf("We are in: %s \n",cwd); 
 
-    dst = fopen(destination,"wb");
-
+    dst = fopen(hash,"wb");
+    free(hash);
     if(dst==NULL){
         perror("fopen");
         chdir("..");
@@ -153,12 +60,147 @@ int makeFile(char *destination,char *source){
     fclose(dst);
 
     if(chdir("..")!=0){
-        printf("Error switchting directory");
+        printf("Error switchting directory\n");
         return 1;
     }
     fclose(src);
     return 0;
 }
+
+// searches if we are in a .bgit repository 
+// chInto = 0 ->chdir into top level folder
+int searchbGit(int chInto){
+    DIR *dir;
+    struct dirent *dirent;
+    char cwd[128];
+    getcwd(cwd,sizeof(cwd));
+    printf("In: %s \n",cwd);
+    // optimization of using first string and rm until next '/' instead of cwd overwriting
+    while ((strcmp(cwd,"/"))!=0)
+    {
+        printf("In: %s \n",cwd);
+        if((dir=opendir("."))==NULL){
+            printf("Error opening directory\n");
+            return 1;
+        }
+        if ((dirent =readdir(dir))==NULL){
+            printf("Error reading directory\n");
+            return 1;
+        }
+        while (dirent!=NULL)
+        {
+            
+            if((strcmp(dirent->d_name,".bgit")==0)){
+                getcwd(cwd,sizeof(cwd));
+                if(chInto==0){
+                    if(chdir(cwd)!=0){
+                        printf("Error changing directory\n");
+                    }
+                }
+                printf("Found '.bgit' in %s \n",cwd);
+                return 0;
+            }
+            
+            dirent =readdir(dir);
+        }
+        closedir(dir);
+        if((chdir(".."))!=0){
+            printf("Error changing directory\n");
+            return 1;
+        }
+        getcwd(cwd,sizeof(cwd));
+    }
+    printf("Not in a repository\n");
+    return 1;
+}
+
+struct FileMeta
+{
+    ino_t inode;
+    off_t size;
+    time_t mtime; //modification time
+    char name[128];
+};
+
+int makeIndx(char *filename,struct stat FileMetaData){
+    if((searchbGit(0))!=0) return -1;
+    FILE *indx;
+
+    struct FileMeta content ;
+    strcpy(content.name,filename);
+    content.inode =FileMetaData.st_ino;
+    content.size =FileMetaData.st_size;
+    content.mtime = FileMetaData.st_mtime;
+
+    struct FileMeta old;
+    if(chdir(".bgit")!=0){
+        printf("Error changing directory\n");
+        return 1;
+    }
+    // check if file is already in index file
+    size_t bytesRead;
+    indx =fopen("index","a+b"); // append and not overwrite 
+    // position of reading pointer still at the start of the file
+    while(bytesRead=fread(&old,sizeof(content),1,indx)>0){
+        if(old.inode==content.inode){
+            printf("Got old data:%s \n",old.name);
+            fclose(indx);
+            if(chdir("..")!=0){
+                printf("Error changing directory\n");
+                return 1;
+            }
+            return 0;
+        }
+    }
+    // If not indexed yet, first create file/directory
+    // making sure it worked and then adding to index
+    if(chdir("..")!=0){
+        printf("Error changing directory\n");
+        return 1;
+    }
+    if(makeFile(filename,filename)!=0) return 1;
+
+    printf("Added new data to Index: %s \n",content.name);
+    fwrite(&content,sizeof(content),1,indx);
+
+    fclose(indx);
+
+}
+int readIndx(){
+    if((searchbGit(0))!=0) return -1;
+    FILE *indx;
+    
+    struct FileMeta content;
+    
+    if(chdir(".bgit")!=0){
+        printf("Error changing directory\n");
+        return 1;
+    }
+
+    size_t bytesRead;
+    indx =fopen("index","rb");
+    while (bytesRead=fread(&content,sizeof(content),1,indx)>0)
+    {
+        printf("Name: %s \n",content.name);
+        printf("Inode: %ld \n",content.inode);
+        printf("Size: %ld \n",content.size);
+        printf("Change time: %ld \n",content.mtime);
+    }
+   
+    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[128]),SEEK_CUR);
+    
+    
+    
+    fclose(indx);
+}
+// Change into the Top-Level Folder of the Repository
+// assuming we are in a Repositorys
+int chdirTop(){
+    char cwd[64];
+    getcwd(cwd,sizeof(cwd));
+
+}
+
 
 int hashAll(char *filepath){
     struct stat fileMeta; // struct from stat.h to save fileinfo/Metadata
@@ -166,12 +208,11 @@ int hashAll(char *filepath){
         // st_ino for the inode (unique identifier)
         // and st_mtime for last 
         // check with inode if we have file already if not git add
-        printf(filepath);
         DIR *dir; // directory pointer
         struct dirent *dirent; // directory entry
 
         if((dir=opendir(filepath))==NULL){
-            printf("Error opening directory");
+            printf("Error opening directory\n");
             return 1;
         }
         do
@@ -267,7 +308,7 @@ int main(int argc, char *argv[]){
             return 1; // early return
         } 
 
-        printf("initialize Repo");
+        printf("initialize Repo\n");
         free(filepath); // free memory
     }else if (strcmp(command,"status")==0){
         // TODO: apply with branches
@@ -279,7 +320,7 @@ int main(int argc, char *argv[]){
         hashAll(".");
         t = clock() - t;
         double time_spent = ((double)t) *1000 / CLOCKS_PER_SEC;
-        printf("Took %fms",time_spent);
+        printf("Took %fms \n",time_spent);
         return 0;
 
         
@@ -289,30 +330,32 @@ int main(int argc, char *argv[]){
         // TODO: add directories for add and remove 
         char *path = argv[2];
         // writes to index file
-        //makeIndx();
-        makeFile(path,path);
+        struct stat file;
+        stat(path,&file);
+        makeIndx(path,file);
         // logic with metafile
         // also adding "."
     }else if(strcmp(command,"rm")==0){
         char *path = argv[2];
         // also adding "."
         if(chdir(".bgit")!=0){
-            printf("Error switchting directory");
+            printf("Error switchting directory\n");
             return 1;
         }
         
         remove(path);
 
         if(chdir("..")!=0){
-            printf("Error switchting directory");
+            printf("Error switchting directory\n");
             return 1;
         }
     }else if(strcmp(command,"test")==0){
         struct stat file;
-        stat("main.c",&file);
-        makeIndx("main.c",file);
+        char *fileName ="sha256.c";
+        stat(fileName,&file);
+        makeIndx(fileName,file);
         readIndx();
     }else{
-        printf("%s is not a valid command for Bombagit",command);
+        printf("%s is not a valid command for Bombagit \n",command);
     }
 }
