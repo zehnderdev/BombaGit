@@ -1,13 +1,13 @@
 CC = gcc
-CFLAGS = -lcrypto
-
+LDLIBS = -lcrypto
+CFLAGS = -Wall -Wextra -Werror -std=c17
 DST  = bgit
 
 SRC = src/main.c src/sha256.c #need both
 
 # $@ left and $^ right of ":"
 $(DST): $(SRC)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 .PHONY: clean
 
