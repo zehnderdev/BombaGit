@@ -28,6 +28,8 @@ You can also clone the repo itself and run the ``install.sh`` script.
 - rm (under construction)
 - help (under construction)
 
+## Additions
+- Ignore file (planned)
 
 ## Help
 
