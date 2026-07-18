@@ -11,6 +11,10 @@
 #include "sha256.h"
 #include <sys/types.h>
 
+// Definiton for searchIndex()
+#define FOUND 0
+#define NOT_FOUND 1
+#define ERROR 2
 
 // TODO: function for easy directory switching
 
@@ -30,11 +34,11 @@ int searchbGit(int chInto){
     struct dirent *dirent;
     char cwd[128];
     getcwd(cwd,sizeof(cwd));
-    printf("In: %s \n",cwd);
+    //printf("In: %s \n",cwd);
     // optimization of using first string and rm until next '/' instead of cwd overwriting
     while ((strcmp(cwd,"/"))!=0)
     {
-        printf("In: %s \n",cwd);
+        //printf("In: %s \n",cwd);
         if((dir=opendir("."))==NULL){
             printf("Error opening directory\n");
             return 1;
@@ -53,7 +57,8 @@ int searchbGit(int chInto){
                         printf("Error changing directory\n");
                     }
                 }
-                printf("Found '.bgit' in %s \n",cwd);
+                //printf("Found '.bgit' in %s \n",cwd);
+                //printf("Changed into %s \n",cwd);
                 return 0;
             }
             
@@ -73,25 +78,35 @@ int searchbGit(int chInto){
 int searchIndex(ino_t Inode,struct FileMeta *result){
     if((searchbGit(0))!=0) return 1;
     if(chdir(".bgit")!=0){
-        printf("Error changing directory\n");
-        return 1;
+        perror("chdir");
+        return ERROR;
     }
+    
     FILE *indx;
     indx = fopen("index","rb");
+    // TODO: handle ALL Errors!
+    if(indx==NULL){
+        chdir("..");
+        return NOT_FOUND;
+    }
     size_t bytesRead;
-    while((bytesRead=fread(&result,sizeof(result),1,indx))>0){
+    while((bytesRead=fread(result,sizeof(*result),1,indx))>0){
         if(result->inode==Inode){
-            printf("Got old data:%s \n" ,result->name);
+            //printf("Got old data:%s \n" ,result->name);
             fclose(indx);
             if(chdir("..")!=0){
                 printf("Error changing directory\n");
-                return 1;
+                return ERROR;
             }
-            return 0;
+            return FOUND;
         }
     }
-    printf("Did not found old data in Index");
-    return 1;
+    if(chdir("..")!=0){
+        printf("Error changing directory\n");
+        return ERROR;
+    }
+    //printf("Did not find old data in Index\n");
+    return NOT_FOUND;
 }
 // Copies a file from source to .bgit folder
 int makeFile(char *source){
@@ -179,6 +194,7 @@ int makeIndx(char *filename,struct stat FileMetaData){
             return 0;
         }
     }
+    printf("Did not found in index");
     // If not indexed yet, first create file/directory
     // making sure it worked and then adding to index
     if(chdir("..")!=0){
@@ -239,8 +255,11 @@ int hashAll(char *filepath){
         DIR *dir; // directory pointer
         struct dirent *dirent; // directory entry
 
+        char cwd[64];
+        getcwd(cwd,sizeof(cwd));
+        //printf("Before hashing %s in: %s \n",filepath,cwd);
         if((dir=opendir(filepath))==NULL){
-            printf("Error opening directory\n");
+            printf("Error opening directory1\n");
             return 1;
         }
         do
@@ -266,9 +285,10 @@ int hashAll(char *filepath){
                     // check contents
                     // load old stats
                     struct FileMeta old;
-                    
+                    //printf("This is the path %s \n",fullpath);
                     stat(fullpath,&fileMeta);//get fileMetaData
-                    if((searchIndex(fileMeta.st_ino,&old))!=0) return 1;
+                    int ret = searchIndex(fileMeta.st_ino,&old);
+                    if(ret == FOUND){
                     printf("got metadata for %s \n",dirent->d_name);
                     if(fileMeta.st_mtime > old.mtime && fileMeta.st_size != old.size){
                         char *hash = hashFile(fullpath);
@@ -279,13 +299,17 @@ int hashAll(char *filepath){
                         }
 
                     }
+                    }else if (ret == NOT_FOUND){
+                        // Not tracked
+                        printf("Not Indexed yet: %s \n",fullpath);
+                    }else return 1;
                     break;
 
                 case 4:
                     // dir 
                     // recursion
 
-                    printf("Dir: %s using recursion\n",fullpath);
+                    //printf("Dir: %s using recursion\n",fullpath);
 
                     hashAll(fullpath);
                     break;
@@ -361,7 +385,14 @@ int main(int argc, char *argv[]){
         // writes to index file
         struct stat file;
         stat(path,&file);
-        makeIndx(path,file);
+        if(S_ISREG(file.st_mode)) makeIndx(path,file);
+        else if(S_ISDIR(file.st_mode))hashAll(path);
+        else{
+            printf("Path given is not a file or Dir");
+            return 1;
+        }
+        return 0;
+        
         // logic with metafile
         // also adding "."
     }else if(strcmp(command,"rm")==0){
