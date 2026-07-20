@@ -209,6 +209,45 @@ int makeIndx(char *filename,struct stat FileMetaData){
     fclose(indx);
     return 0;
 }
+int buildSortArray(){
+    // It is given that the index is always sorted by namen
+    // This hold because we put the elements in one after another
+    // could implement when we have many elements 10+ or so we do mergesort
+    if(chdir(".bgit")!=0){
+        perror("chdir");
+        return 1;
+    }
+    struct stat fileData;
+    stat("index",&fileData);
+    FILE *indx;
+    indx = fopen("index","rb");
+    if(indx==NULL){
+        chdir("..");
+        return NOT_FOUND;
+    }
+    int fileCount = (fileData.st_size/sizeof(struct FileMeta));
+    struct FileMeta *files = malloc(fileCount * sizeof(struct FileMeta));
+    
+    size_t bytesRead;
+    for (size_t i = 0; i < (size_t)fileCount; i++)
+    {
+        if ((bytesRead=fread(&files[i],sizeof(struct FileMeta),1,indx))>0)
+        {
+            printf("%ld is %s\n",i,files[i].name);
+        }
+        
+    }
+
+    
+    if(files ==NULL){
+        printf("Malloc error");
+        free(files);
+        return 1;
+    }
+    fclose(indx);
+    free(files);
+    return 0;
+}
 int readIndx(){
     if((searchbGit(0))!=0) return -1;
     FILE *indx;
@@ -413,8 +452,9 @@ int main(int argc, char *argv[]){
         struct stat file;
         char *fileName ="sha256.c";
         stat(fileName,&file);
-        makeIndx(fileName,file);
-        readIndx();
+        //makeIndx(fileName,file);
+        //readIndx();
+        buildSortArray();
     }else{
         printf("%s is not a valid command for Bombagit \n",command);
     }
