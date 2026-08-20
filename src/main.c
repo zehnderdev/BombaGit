@@ -10,7 +10,7 @@
 #include <dirent.h>
 #include "sha256.h"
 #include <sys/types.h>
-
+#include <limits.h>
 
 // Definiton for searchIndex()
 #define FOUND 0
@@ -223,6 +223,167 @@ int makeIndx(char *filename,struct stat FileMetaData){
     fclose(indx);
     return 0;
 }
+
+int readIndx(int tmp){
+    if((searchbGit(0))!=0) return -1;
+    FILE *indx;
+    
+    struct FileMeta content;
+    
+    if(chdir(".bgit")!=0){
+        printf("Error changing directory\n");
+        return 1;
+    }
+    if(tmp ==1){
+        printf("opening temp\n");
+        indx =fopen("index.tmp","a+b");
+    }else{
+        indx =fopen("index","a+b");
+    }
+    size_t bytesRead;
+    fseek(indx,0,SEEK_SET);
+    while ((bytesRead=fread(&content,sizeof(content),1,indx))>0)
+    {
+        printf("Name: %s \n",content.name);
+        printf("Inode: %ld \n",content.inode);
+        printf("Hash: %s\n",content.hash);
+        printf("Size: %ld \n",content.size);
+        printf("Change time: %ld \n",content.mtime);
+    }
+   
+    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[128]),SEEK_CUR);
+    
+    
+    
+    fclose(indx);
+     
+    if(chdir("..")!=0){
+        printf("Error changing directory\n");
+        return 1;
+    }
+    return 0;
+}
+
+int mergeIndx(struct FileMeta *oldindex,struct FileMeta *added,int left, int right){
+    FILE *temp;
+    temp =fopen("index.tmp","w+b");
+    if(temp==NULL){
+        perror("fopen");
+        return 1;
+    }
+    if(chdir("..")!=0){
+        perror("chdir");
+        return 1;
+    }
+    int i = 0;
+    int j = 0;
+    printf("check\n");
+    while(i<left && j < right){
+        if(strcmp(oldindex[i].name,added[j].name)<0){
+            fwrite(&oldindex[i],sizeof(struct FileMeta),1,temp);
+            i++;
+            printf("check left\n");
+        }else if(strcmp(oldindex[i].name,added[j].name)>0){
+            strcpy(added[j].hash,(hashFile(added[j].name)));
+            fwrite(&added[j],sizeof(struct FileMeta),1,temp);
+            j++;
+            printf("check rigth\n");
+        }else{
+            // names are the same
+
+            // if changes is size or time happend hashFile again
+            if(oldindex[i].mtime != added[j].mtime || oldindex[i].size != added[j].size){
+                strcpy(added[j].hash,(hashFile(added[j].name)));
+                // save new struct if hashes differ
+                if(strcmp(added[i].hash,added[j].hash) !=0){
+                    fwrite(&added[j],sizeof(struct FileMeta),1,temp);
+                }
+                // no look at else because most most likely nothing changed
+            }
+            i++,j++;
+        }
+    }
+    printf("While\n");
+    // add remaining arrays
+    while (i<left){
+        printf("Filename :%s\n",oldindex[i].name);
+        fwrite(&oldindex[i],sizeof(struct FileMeta),1,temp);
+        i++;
+    }
+    while (j<right)
+    {
+        printf("Filename :%s\n",added[j].name);
+        strcpy(added[j].hash,(hashFile(added[j].name)));
+        fwrite(&added[j],sizeof(struct FileMeta),1,temp);
+        j++;
+    }
+
+    fclose(temp);
+    if(chdir(".bgit")!=0){
+        perror("chdir");
+    }
+    system("ls -la");
+    if(rename("index.tmp","index")!=0){
+        perror("rename");
+    }else{
+        printf("Rename worked \n");
+
+    }
+    system("ls -la");
+    
+    return 0;
+}
+
+// First for normal files then for directories
+// For many files
+int makeTempIndex(struct FileMeta *Files){
+    if(chdir(".bgit")!=0){
+        perror("chdir");
+        return 1;
+    }
+    FILE *indx;
+    indx = fopen("index","r+b");
+
+    if (indx == NULL){
+        indx = fopen("index","w+b");
+        if(indx == NULL){
+            perror("fopen");
+            return 1;
+        }
+    }
+    // not using stat for size
+    fseek(indx,0,SEEK_END); // end for size
+    long size = ftell(indx);
+    fseek(indx,0,SEEK_SET); // back to start
+    int fileCount = (size/sizeof(struct FileMeta));
+    struct FileMeta *files = malloc(fileCount * sizeof(struct FileMeta)); 
+    if(files == NULL){
+        perror("malloc");
+        return 1;
+    }
+    size_t bytesRead;
+
+    for (size_t i = 0; i < (size_t)fileCount; i++)
+    {
+        if((bytesRead=fread(&files[i],sizeof(struct FileMeta),1,indx))==0){
+            printf("fread");
+            return 1;
+        }
+    }
+    for (size_t i = 0; i < (size_t)fileCount; i++){
+        printf("%ld, Name:%s \n",i,files[i].name);
+    }
+    fclose(indx);
+    if((mergeIndx(files,Files,fileCount,1))!=0){
+        printf("Error in mergeIndx");
+    }
+    readIndx(0);// debug
+    free(files);
+    
+    return 0;
+}
+
+// for only a few additions 
 int buildSortArray(struct FileMeta data){
     // It is given that the index is always sorted by name
     // This hold because we put the elements in one after another
@@ -250,6 +411,12 @@ int buildSortArray(struct FileMeta data){
     size_t bytesRead;
     struct FileMeta curr ,temp; // make curr and temp for iteration
     // instead of for loop we could do binary search
+    // new file handling ?
+    // existing 
+    
+
+
+    // function that handles inode + name
     for (size_t i = 0; i < (size_t)fileCount; i++)
     {
         if ((bytesRead=fread(&curr,sizeof(struct FileMeta),1,indx))>0)
@@ -267,7 +434,7 @@ int buildSortArray(struct FileMeta data){
                         fseek(indx,(j-1)*sizeof(struct FileMeta),SEEK_SET);
                         fread(&temp,sizeof(struct FileMeta),1,indx);
                         printf("File: %s",temp.name);
-                        fseek(indx,j*sizeof(struct FileMeta) ,SEEK_SET); // No-op
+                        fseek(indx,j*sizeof(struct FileMeta) ,SEEK_SET); 
                         fwrite(&temp,sizeof(struct FileMeta),1,indx);
                     }
                     
@@ -309,41 +476,6 @@ int buildSortArray(struct FileMeta data){
     fclose(indx);
     return 0;
     }
-int readIndx(){
-    if((searchbGit(0))!=0) return -1;
-    FILE *indx;
-    
-    struct FileMeta content;
-    
-    if(chdir(".bgit")!=0){
-        printf("Error changing directory\n");
-        return 1;
-    }
-
-    size_t bytesRead;
-    indx =fopen("index","a+b");
-    fseek(indx,0,SEEK_SET);
-    while ((bytesRead=fread(&content,sizeof(content),1,indx))>0)
-    {
-        printf("Name: %s \n",content.name);
-        printf("Inode: %ld \n",content.inode);
-        printf("Hash: %s\n",content.hash);
-        printf("Size: %ld \n",content.size);
-        printf("Change time: %ld \n",content.mtime);
-    }
-   
-    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[128]),SEEK_CUR);
-    
-    
-    
-    fclose(indx);
-     
-    if(chdir("..")!=0){
-        printf("Error changing directory\n");
-        return 1;
-    }
-    return 0;
-}
 // Change into the Top-Level Folder of the Repository
 // assuming we are in a Repositorys
 int chdirTop(){
@@ -439,7 +571,9 @@ int hashAll(char *filepath){
     return 0;
 
 }
-
+isInsideRepo(){
+    return 0;
+}
 int main(int argc, char *argv[]){
     setbuf(stdout, NULL);
     
@@ -519,12 +653,22 @@ int main(int argc, char *argv[]){
             return 1;
         }
     }else if(strcmp(command,"test")==0){
-        char *path = argv[2];
-        struct FileMeta fileData = MakeMeta(path);
+        //char *path = argv[2];
+        //struct FileMeta fileData = MakeMeta(path);
         //readIndx();
-        buildSortArray(fileData);
-        printf("After insertion:\n \n");
-        readIndx();
+        // buildSortArray(fileData);
+        // printf("After insertion:\n \n");
+        // readIndx();
+        char *path = argv[2];
+        struct FileMeta *files = malloc(1 * sizeof(struct FileMeta));
+        files[0] = MakeMeta(path);
+
+        // isInsideRepo();
+        makeTempIndex(files);
+    }else if(strcmp(command,"debug")==0){
+        readIndx(0);
+        
+        
     }else{
         printf("%s is not a valid command for Bombagit \n",command);
     }
