@@ -571,7 +571,10 @@ int hashAll(char *filepath){
     return 0;
 
 }
-isInsideRepo(){
+
+
+// check if file is in repo
+int isInsideRepo(){
     return 0;
 }
 int main(int argc, char *argv[]){
