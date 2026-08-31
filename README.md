@@ -22,11 +22,11 @@ You can also clone the repo itself and run the ``install.sh`` script.
 - OpenSSl
 
 ## Commands 
-- init 
-- add (under construction)
-- status (under construction)
-- rm (under construction)
-- help (under construction)
+- [x] init 
+- [ ] add (under construction)
+- [ ] status (under construction)
+- [ ] rm (under construction)
+- [ ] help (under construction)
 
 ## Additions
 - Ignore file (planned)
