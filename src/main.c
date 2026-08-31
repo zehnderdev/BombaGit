@@ -572,7 +572,15 @@ int hashAll(char *filepath){
 
 }
 
-
+int helpPage(){
+    // TODO: print out every command and flags
+    printf("Here are common commands for Bombagit:\n\n");
+    printf("init   : Creates an empty Bombagit repository\n");
+    printf("add    : Add file contents to the index file\n");
+    printf("rm     : Remove file from index\n");
+    printf("status : Shows changes in the working tree\n");
+    return 0;
+}
 // check if file is in repo
 int isInsideRepo(){
     return 0;
@@ -581,7 +589,10 @@ int main(int argc, char *argv[]){
     setbuf(stdout, NULL);
     
     // if init command -> create ".bgit" file
-    if(argc <2) return 1; // check if we have 2 arguments at least (first always filename)
+    if(argc <2) {
+        helpPage();
+        return 1;
+    } // check if we have 2 arguments at least (first always filename) we print out the help page if not
     char *command = argv[1];
     
     if(strcmp(command,"init") == 0){
