@@ -26,7 +26,7 @@ You can also clone the repo itself and run the ``install.sh`` script.
 - [ ] add (under construction)
 - [ ] status (under construction)
 - [ ] rm (under construction)
-- [ ] help (under construction)
+- [x] help (needs to be extended tho)
 
 ## Additions
 - Ignore file (planned)
