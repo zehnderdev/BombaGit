@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700 // used for realpath
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,7 @@ struct FileMeta
     off_t size;
     time_t mtime; //modification time
     char hash[65]; // hash has 32*2+1 = 65 chars in Hexadecimal representation
-    char name[128];
+    char name[PATH_MAX];
 };
 
 struct FileMeta MakeMeta(char *fileName){
@@ -42,10 +43,10 @@ struct FileMeta MakeMeta(char *fileName){
 }
 // searches if we are in a .bgit repository 
 // chInto = 0 ->chdir into top level folder
-int searchbGit(int chInto){
+int searchbGit(int chInto,char repo_path[PATH_MAX]){
     DIR *dir;
     struct dirent *dirent;
-    char cwd[128];
+    char cwd[PATH_MAX];
     getcwd(cwd,sizeof(cwd));
     //printf("In: %s \n",cwd);
     // optimization of using first string and rm until next '/' instead of cwd overwriting
@@ -64,14 +65,14 @@ int searchbGit(int chInto){
         {
             
             if((strcmp(dirent->d_name,".bgit")==0)){
-                getcwd(cwd,sizeof(cwd));
+                getcwd(repo_path,sizeof(cwd));
                 if(chInto==0){
                     if(chdir(cwd)!=0){
                         printf("Error changing directory\n");
                     }
                 }
-                //printf("Found '.bgit' in %s \n",cwd);
-                //printf("Changed into %s \n",cwd);
+                printf("Found '.bgit' in %s \n",cwd);
+                printf("Changed into %s \n",cwd);
                 return 0;
             }
             
@@ -89,7 +90,8 @@ int searchbGit(int chInto){
 }
 // Searches IndexFile and returns struct on found
 int searchIndex(ino_t Inode,struct FileMeta *result){
-    if((searchbGit(0))!=0) return 1;
+    char repo_path[PATH_MAX];
+    if((searchbGit(0,repo_path))!=0) return 1;
     if(chdir(".bgit")!=0){
         perror("chdir");
         return ERROR;
@@ -126,7 +128,7 @@ int makeFile(char *source){
 
     // TODO: Add directory with hashall 
     FILE *dst,*src;
-    char cwd2[64];
+    char cwd2[PATH_MAX];
     getcwd(cwd2,sizeof(cwd2));
     printf("We are in %s\n",cwd2);
     printf("Adress:%s\n",source);
@@ -145,7 +147,7 @@ int makeFile(char *source){
         return 1;
     }
     
-    char cwd[64]; //hopefully more than enough
+    char cwd[PATH_MAX]; //hopefully more than enough
     getcwd(cwd,sizeof(cwd));
     printf("We are in: %s \n",cwd); 
 
@@ -178,7 +180,8 @@ int makeFile(char *source){
 
 
 int makeIndx(char *filename,struct stat FileMetaData){
-    if((searchbGit(0))!=0) return -1;
+    char repo_path[PATH_MAX];
+    if((searchbGit(0,repo_path))!=0) return -1;
     FILE *indx;
 
     struct FileMeta content ;
@@ -225,7 +228,8 @@ int makeIndx(char *filename,struct stat FileMetaData){
 }
 
 int readIndx(int tmp){
-    if((searchbGit(0))!=0) return -1;
+    char repo_path[PATH_MAX];
+    if((searchbGit(0,repo_path))!=0) return -1;
     FILE *indx;
     
     struct FileMeta content;
@@ -251,7 +255,7 @@ int readIndx(int tmp){
         printf("Change time: %ld \n",content.mtime);
     }
    
-    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[128]),SEEK_CUR);
+    //fseek(indx,sizeof(struct FileMeta)-sizeof(char[PATH_MAX]),SEEK_CUR);
     
     
     
@@ -449,7 +453,7 @@ int buildSortArray(struct FileMeta data){
     }
     if(written!=0){
         // new file Need to compute hash and then write to index
-        char cwd[64];
+        char cwd[PATH_MAX];
         getcwd(cwd,sizeof(cwd));
         printf("Name is %s\n In %s\n",data.name,cwd);
         if(chdir("..")!=0){
@@ -479,7 +483,7 @@ int buildSortArray(struct FileMeta data){
 // Change into the Top-Level Folder of the Repository
 // assuming we are in a Repositorys
 int chdirTop(){
-    char cwd[64];
+    char cwd[PATH_MAX];
     getcwd(cwd,sizeof(cwd));
     return 0;
 }
@@ -494,7 +498,7 @@ int hashAll(char *filepath){
         DIR *dir; // directory pointer
         struct dirent *dirent; // directory entry
 
-        char cwd[64];
+        char cwd[PATH_MAX];
         getcwd(cwd,sizeof(cwd));
         //printf("Before hashing %s in: %s \n",filepath,cwd);
         if((dir=opendir(filepath))==NULL){
@@ -582,8 +586,9 @@ int helpPage(){
     return 0;
 }
 // check if file is in repo
-int isInsideRepo(){
-    return 0;
+int isInsideRepo(char *repo_path, char *file_path){
+    size_t len = sizeof(repo_path);
+    return (strncmp(repo_path,file_path,len)==0 && (file_path[len] == '/' || file_path[len] == '\0'));
 }
 int main(int argc, char *argv[]){
     setbuf(stdout, NULL);
@@ -598,7 +603,7 @@ int main(int argc, char *argv[]){
     if(strcmp(command,"init") == 0){
         char *suffix = "/.bgit"; // we call it bgit for now
 
-        char cwd[64]; //hopefully more than enough
+        char cwd[PATH_MAX]; //hopefully more than enough
         getcwd(cwd,sizeof(cwd)); 
 
         char *filepath = malloc(strlen(suffix)+strlen(cwd)+1); // allocate memory
@@ -673,11 +678,23 @@ int main(int argc, char *argv[]){
         // buildSortArray(fileData);
         // printf("After insertion:\n \n");
         // readIndx();
-        char *path = argv[2];
+        char *filePath = argv[2];
+        char cwd[PATH_MAX];
+        char repo_path[PATH_MAX];
+        char fullPath[PATH_MAX];
         struct FileMeta *files = malloc(1 * sizeof(struct FileMeta));
-        files[0] = MakeMeta(path);
+        files[0] = MakeMeta(filePath);
+        
+        getcwd(cwd,sizeof(cwd));
+        
+        if(searchbGit(0,repo_path)!=0){
+            perror("searchbGit");
+            return 1;
+        }
 
-        // isInsideRepo();
+        if(realpath(filePath,fullPath)==NULL) return 1; 
+        if(isInsideRepo(repo_path,fullPath)!=0) return 1; 
+        printf("File inside Repo");
         makeTempIndex(files);
     }else if(strcmp(command,"debug")==0){
         readIndx(0);
