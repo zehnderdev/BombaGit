@@ -700,6 +700,9 @@ int main(int argc, char *argv[]){
         readIndx(0);
         
         
+    }else if(strcmp(command,"help")==0){
+        helpPage();
+        return 0;
     }else{
         printf("%s is not a valid command for Bombagit \n",command);
     }
